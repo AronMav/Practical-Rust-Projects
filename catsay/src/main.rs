@@ -1,5 +1,7 @@
 
 use clap::Parser;
+use colored::Colorize;
+
 #[derive(Parser)]
 struct Options {
     #[clap(default_value = "Meow!")]
@@ -19,10 +21,10 @@ fn main() {
         eprintln!("A cat shouldn't bark like a dog.")
     };
 
-    println!("{}", message);
+    println!("{}", message.bright_yellow().underline().on_purple());
     println!(" \\");
     println!("  \\");
     println!("     /\\_/\\");
-    println!("    ( {eye} {eye} )");
+    println!("    ( {eye} {eye} )", eye = eye.red().bold());
     println!("    =( I )=");
 }
