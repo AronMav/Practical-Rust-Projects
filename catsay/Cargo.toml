@@ -7,5 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+assert_cmd = "2.0.12"
 clap = { version = "4.2.1", features = ["derive"] }
 colored = "2.0.4"
+predicates = "3.0.4"
