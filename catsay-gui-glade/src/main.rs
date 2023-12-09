@@ -23,6 +23,11 @@ fn build_ui(app: &gtk::Application) {
     let message_output:gtk::Label = builder.object(
         "message_output"
     ).unwrap();
+
+    let is_dead_switch:gtk::Switch = builder.object(
+        "is_dead_switch"
+    ).unwrap();
+
     let image_output:gtk::Image = builder.object(
         "image_output"
     ).unwrap();
@@ -34,6 +39,18 @@ fn build_ui(app: &gtk::Application) {
             "{}\n \\\n \\",
             message_input.text().as_str()
         ));
+
+        let is_dead = is_dead_switch.is_active();
+        if is_dead {
+            image_output_clone.set_from_file(
+                Some("./images/cat_dead.png")
+            )
+        } else {
+            image_output_clone.set_from_file(
+                Some("./images/cat.png")
+            )
+        }
+
         image_output_clone.show();
     });
 
