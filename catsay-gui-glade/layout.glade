@@ -88,7 +88,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkButton" id="generate_bin">
+              <object class="GtkButton" id="generate_btn">
                 <property name="label" translatable="yes">
 Generate
 </property>
