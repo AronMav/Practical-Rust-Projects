@@ -5,9 +5,12 @@ use gloo_file::File;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{FileList, HtmlInputElement};
 use base64::{engine::general_purpose, Engine};
+use stylist::{yew::styled_component, Style};
 
-#[function_component(App)]
+#[styled_component(App)]
 fn app() -> Html {
+    const CSS: &str = include_str!("index.css");
+    let stylesheet = Style::new(CSS).unwrap();
     let cat_list = use_state(||Vec::<CatDetails>::new());
 
     let on_change = {
@@ -34,14 +37,16 @@ fn app() -> Html {
     };
 
     html! {
-        <div>
-            <h1>{"Catdex"}</h1>
+        <div class= {stylesheet}>
+            <h1>{format!("Catdex")}</h1>
+            <label for="file-upload"/>
             <input
-                type = "file"
-                accept = "image/*"
-                onchange = {on_change}
+                id="file-upload"
+                type="file"
+                accept="image/*"
+                onchange={on_change}
             />
-            <section class = "cats">
+            <section class="cats">
                 { for cat_list.iter().map(cat) }
             </section>
         </div>

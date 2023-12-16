@@ -9,6 +9,7 @@ edition = "2021"
 base64 = "0.21.5"
 gloo-file = { version = "0.3.0", features = ["futures"] }
 js-sys = "0.3.66"
+stylist = { version = "0.13.0", features = ["yew", "parser"] }
 wasm-bindgen-futures = "0.4.39"
 web-sys = "0.3.66"
 yew = { version = "0.21.0", features = ["csr"] }
