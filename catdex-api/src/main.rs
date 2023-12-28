@@ -23,7 +23,7 @@ async fn add_cat_endpoint(
     let file_path = parts
         .files
         .take("image")
-        .pop(
+        .pop()
         .and_then(|f| f.persist_in("./image").ok())
         .unwrap_or_default();
 
@@ -70,16 +70,27 @@ async fn cats_endpoint(
     Ok(HttpResponse::Ok().json(cats_data))
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    //Setting up the database connection pool
+fn setup_database() -> DbPool {
     let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
     let manager =
         ConnectionManager::<PgConnection>::new(&database_url);
-    let pool = r2d2::Pool::builder()
+    r2d2::Pool::builder()
         .build(manager)
-        .expect("Failed to create DB connection pool.");
+        .expect("Failed to create DB connection pool.")
+}
+
+fn api_config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api")
+            .route("/cats", web::get().to(cats_endpoint))
+            .route("/add_cat", web::post().to(add_cat_endpoint)),
+    );
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let pool = setup_database();
 
     println!("Listening on port 8080");
     HttpServer::new(move ||{
@@ -89,6 +100,7 @@ async fn main() -> std::io::Result<()> {
                 awmp::PartsConfig::default()
                 .with_temp_dir("./tmp")
             )
+            .configure(api_config) // Used here
             .service(
                 Files::new("/static", "static")
                     .show_files_listing(),
@@ -97,17 +109,30 @@ async fn main() -> std::io::Result<()> {
                 Files::new("/image","image")
                     .show_files_listing(),
             )
-            .service(
-                web::scope("/api")
-                    .route("/cats", web::get().to(cats_endpoint)
-                )
-                .route("/add_cat",
-                       web::post().to(add_cat_endpoint)
-                )
-            )
             .route("/", web::get().to(index))
     })
         .bind("127.0.0.1:8080")?
         .run()
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test, App};
+
+    #[actix_web::test]
+    async fn test_cats_endpoint_get() {
+        let pool = setup_database();
+        let mut app = test::init_service(
+            App::new().app_data(web::Data::new(pool.clone()))
+                .configure(api_config),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/cats")
+            .to_request();
+        let resp = test::call_service(&mut app, req).await;
+        assert!(resp.status().is_success());
+    }
 }
