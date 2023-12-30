@@ -9,11 +9,17 @@ use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use std::env;
 use std::collections::HashMap;
+use serde::Deserialize;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
 async fn index() -> Result<NamedFile> {
     Ok(NamedFile::open("./static/index.html")?)
+}
+
+#[derive(Deserialize)]
+struct CatEndpointPath {
+    id: i32,
 }
 
 async fn add_cat_endpoint(
@@ -70,6 +76,21 @@ async fn cats_endpoint(
     Ok(HttpResponse::Ok().json(cats_data))
 }
 
+async fn cat_endpoint(
+    pool: web::Data<DbPool>,
+    cat_id: web::Path<CatEndpointPath>,
+) -> Result<HttpResponse, Error> {
+    let mut connection =
+        pool.get().expect("Can't get db connection from pool");
+
+    let cats_data = web::block(move ||{
+        cats.filter(id.eq(cat_id.id))
+            .first::<Cat>(&mut connection)
+    })
+        .await?.map_err(error::ErrorInternalServerError)?;
+    Ok(HttpResponse::Ok().json(cats_data))
+}
+
 fn setup_database() -> DbPool {
     let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
@@ -84,7 +105,8 @@ fn api_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
             .route("/cats", web::get().to(cats_endpoint))
-            .route("/add_cat", web::post().to(add_cat_endpoint)),
+            .route("/add_cat", web::post().to(add_cat_endpoint))
+            .route("/cat/{id}", web::get().to(cat_endpoint))
     );
 }
 
