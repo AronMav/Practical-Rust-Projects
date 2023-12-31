@@ -15,3 +15,4 @@ handlebars = {version = "4.5.0", features = ["dir_source"]}
 r2d2 = "0.8.10"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
+validator = { version = "0.16.1", features = ["derive"] }

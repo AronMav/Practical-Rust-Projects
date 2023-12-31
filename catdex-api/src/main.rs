@@ -10,6 +10,7 @@ use diesel::r2d2::{self, ConnectionManager};
 use std::env;
 use std::collections::HashMap;
 use serde::Deserialize;
+use validator::Validate;
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -17,8 +18,9 @@ async fn index() -> Result<NamedFile> {
     Ok(NamedFile::open("./static/index.html")?)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 struct CatEndpointPath {
+    #[validate(range(min = 1, max = 150))]
     id: i32,
 }
 
@@ -80,6 +82,10 @@ async fn cat_endpoint(
     pool: web::Data<DbPool>,
     cat_id: web::Path<CatEndpointPath>,
 ) -> Result<HttpResponse, Error> {
+    cat_id
+        .validate()
+        .map_err(error::ErrorBadRequest)?;
+
     let mut connection =
         pool.get().expect("Can't get db connection from pool");
 
