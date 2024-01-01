@@ -120,6 +120,9 @@ fn setup_database() -> DbPool {
 fn api_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
+            .app_data(web::PathConfig::default().error_handler(
+                |_, _| UserError::ValidationError.into(),
+            ))
             .route("/cats", web::get().to(cats_endpoint))
             .route("/add_cat", web::post().to(add_cat_endpoint))
             .route("/cat/{id}", web::get().to(cat_endpoint))
