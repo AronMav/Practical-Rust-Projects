@@ -15,7 +15,9 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use validator::Validate;
 use actix_web::middleware::Logger;
+use env_logger::builder;
 use log::{error, info, warn};
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -164,6 +166,17 @@ fn api_config(cfg: &mut web::ServiceConfig) {
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
+    let mut builder =
+    SslAcceptor::mozilla_intermediate(SslMethod::tls())
+        .unwrap();
+    builder
+        .set_private_key_file(
+            "key-no-password.pem",
+            SslFiletype::PEM,
+        )
+        .unwrap();
+    builder.set_certificate_chain_file("cert.pem").unwrap();
+
     let pool = setup_database();
 
     println!("Listening on port 8080");
@@ -174,7 +187,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(awmp::PartsConfig::default()
                 .with_temp_dir("./tmp")
             )
-            .configure(api_config) // Used here
+            .configure(api_config)
             .service(
                 Files::new("/static", "static")
                     .show_files_listing(),
@@ -185,7 +198,7 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(index))
     })
-        .bind("127.0.0.1:8080")?
+        .bind_openssl("127.0.0.1:8080", builder)?
         .run()
         .await
 }
