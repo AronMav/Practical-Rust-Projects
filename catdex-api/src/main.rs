@@ -5,7 +5,7 @@ mod errors;
 use self::model::*;
 use self::schema::cats::dsl::*;
 use self::errors::UserError;
-use actix_web::{web, App, HttpServer, HttpResponse, Result, Error, error};
+use actix_web::{web, App, HttpServer, HttpResponse, Result};
 use actix_files::{Files, NamedFile};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -14,6 +14,8 @@ use std::{env, io};
 use std::collections::HashMap;
 use serde::Deserialize;
 use validator::Validate;
+use actix_web::middleware::Logger;
+use log::{error, info, warn};
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -30,25 +32,31 @@ struct CatEndpointPath {
 async fn add_cat_endpoint(
     pool:web::Data<DbPool>,
     mut parts: awmp::Parts,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, UserError> {
     let file_path = parts
         .files
         .take("image")
         .pop()
         .and_then(|f| f.persist_in("./image").ok())
-        .unwrap_or_default();
+        .ok_or_else(|| {
+            error!("Error in getting image path");
+            UserError::ValidationError
+        })?;
 
     let text_fields: HashMap<_,_> = parts
-        .texts
-        .as_pairs()
-        .into_iter()
-        .collect();
+        .texts.as_pairs().into_iter().collect();
 
     let mut connection = pool.get()
-        .expect("Can't get db connection from pool");
+        .map_err(|_|{
+            error!("Failed to get DB connection from pool");
+            UserError::DBPoolGetError
+        })?;
 
     let new_cat = NewCat {
-        name: text_fields.get("name").unwrap().to_string(),
+        name: text_fields.get("name").ok_or_else(||{
+            error!("Error in getting name field");
+            UserError::ValidationError
+        })?.to_string(),
         image_path: file_path.to_string_lossy().to_string()
     };
 
@@ -58,8 +66,14 @@ async fn add_cat_endpoint(
         .execute(&mut connection)
         )
         .await
-        .map_err(error::ErrorInternalServerError)?
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| {
+            error!("Blocking Thread Pool Error");
+            UserError::UnexpectedError
+        })?
+        .map_err(|_| {
+            error!("Failed to get DB connection from pool");
+            UserError::DBPoolGetError
+        })?;
 
     Ok(HttpResponse::Created().finish())
 
@@ -67,7 +81,7 @@ async fn add_cat_endpoint(
 
 async fn cats_endpoint(
     pool: web::Data<DbPool>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, UserError> {
     let mut connection =
         pool.get().expect("Can't get db connection from pool");
 
@@ -75,8 +89,14 @@ async fn cats_endpoint(
         cats.limit(100).load::<Cat>(&mut connection)
     })
         .await
-        .map_err(error::ErrorInternalServerError)?
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| {
+            error!("Blocking Thread Pool Error");
+            UserError::UnexpectedError
+        })?
+        .map_err(|_| {
+            error!("Failed to get DB connection from pool");
+            UserError::DBPoolGetError
+        })?;
 
     Ok(HttpResponse::Ok().json(cats_data))
 }
@@ -85,11 +105,14 @@ async fn cat_endpoint(
     pool: web::Data<DbPool>,
     cat_id: web::Path<CatEndpointPath>,
 ) -> Result<HttpResponse, UserError> {
-    cat_id
-        .validate()
-        .map_err(|_| UserError::DBPoolGetError)?;
-    let mut connection =
-        pool.get().map_err(|_| UserError::DBPoolGetError)?;
+    cat_id.validate().map_err(|_| {
+        warn!("Parameter validation failed");
+        UserError::ValidationError
+    })?;
+    let mut connection = pool.get().map_err(|_| {
+        error!("Failed to get DB connection from pool");
+        UserError::DBPoolGetError
+    })?;
 
     let query_id = cat_id.id.clone();
     let cats_data = web::block(move ||{
@@ -97,12 +120,20 @@ async fn cat_endpoint(
             .first::<Cat>(&mut connection)
     })
         .await
-        .map_err(|_|UserError::UnexpectedError)?
+        .map_err(|_| {
+            error!("Blocking Theread Pool Error");
+            UserError::UnexpectedError
+        })?
         .map_err(|e| match e {
             diesel::result::Error::NotFound => {
+                error!("Cat ID: {} not found in DB",
+                &cat_id.id);
                 UserError::NotFoundError
             }
-            _ => UserError::UnexpectedError,
+            _ => {
+                error!("Unexpected error");
+                UserError::UnexpectedError
+            },
         })?;
     Ok(HttpResponse::Ok().json(cats_data))
 }
@@ -131,14 +162,16 @@ fn api_config(cfg: &mut web::ServiceConfig) {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init();
+
     let pool = setup_database();
 
     println!("Listening on port 8080");
     HttpServer::new(move ||{
         App::new()
+            .wrap(Logger::default())
             .app_data(web::Data::new(pool.clone()))
-            .app_data(
-                awmp::PartsConfig::default()
+            .app_data(awmp::PartsConfig::default()
                 .with_temp_dir("./tmp")
             )
             .configure(api_config) // Used here
