@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-const ARENA_WIDTH: f32 = 500.0;
-const ARENA_HEIGHT: f32 = 500.0;
+const ARENA_WIDTH: f32 = 200.0;
+const ARENA_HEIGHT: f32 = 200.0;
 const PLAYER_HEIGHT: f32 = 32.0;
 const PLAYER_WIDTH: f32 = 22.0;
 
@@ -18,24 +18,52 @@ struct Player {
 
 fn initialize_player(
     commands: &mut Commands,
-    cat_sprite: Handle<Image>,
+    atlas: Handle<TextureAtlas>,
+    cat_sprite: usize,
     side: Side,
     x: f32,
     y: f32,
 ) {
     commands.spawn((
         Player { side },
-        SpriteBundle {
-            texture: cat_sprite,
+        SpriteSheetBundle {
+            sprite: TextureAtlasSprite::new(cat_sprite),
+            texture_atlas: atlas,
             transform: Transform::from_xyz(x,y,0.0),
             ..default()
         },
     ));
 }
 
-
 fn setup(mut commands: Commands,
-    asset_server: Res<AssetServer>) {
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+) {
+    let spritesheet = asset_server.load(
+        "textures/spritesheet.png");
+    let mut sprite_atlas = TextureAtlas::new_empty(
+        spritesheet,
+        Vec2::new(58.0, 34.0));
+
+    let left_cat_corner = Vec2::new(11.0, 1.0);
+    let right_cat_corner = Vec2::new(35.0, 1.0);
+    let cat_size = Vec2::new(22.0, 32.0);
+
+    let left_cat_index = sprite_atlas.add_texture(
+        Rect::from_corners(
+            left_cat_corner,
+            left_cat_corner + cat_size,
+        )
+    );
+    let right_cat_index = sprite_atlas.add_texture(
+        Rect::from_corners(
+            right_cat_corner,
+            right_cat_corner + cat_size,
+        )
+    );
+
+    let texture_atlas_handle = texture_atlases.add(sprite_atlas);
+
     commands.spawn(Camera2dBundle{
         transform: Transform::from_xyz(
             ARENA_WIDTH/2.0,
@@ -43,18 +71,19 @@ fn setup(mut commands: Commands,
         ..default()
     });
 
-    let cat_sprite = asset_server.load("textures/cat-sprite.png");
     initialize_player(
         &mut commands,
-        cat_sprite.clone(),
+        texture_atlas_handle.clone(),
+        left_cat_index,
         Side::Left,
         PLAYER_WIDTH / 2.0,
         PLAYER_HEIGHT/2.0,
     );
-    let cat_sprite_flipped = asset_server.load("textures/cat-sprite_flipped.png");
+
     initialize_player(
         &mut commands,
-        cat_sprite_flipped.clone(),
+        texture_atlas_handle,
+        right_cat_index,
         Side::Right,
         ARENA_HEIGHT - PLAYER_WIDTH / 2.0,
         PLAYER_HEIGHT/2.0,
