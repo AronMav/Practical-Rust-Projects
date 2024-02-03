@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-const ARENA_WIDTH: f32 = 200.0;
-const ARENA_HEIGHT: f32 = 200.0;
+const ARENA_WIDTH: f32 = 500.0;
+const ARENA_HEIGHT: f32 = 500.0;
 const PLAYER_HEIGHT: f32 = 32.0;
 const PLAYER_WIDTH: f32 = 22.0;
 
@@ -51,9 +51,10 @@ fn setup(mut commands: Commands,
         PLAYER_WIDTH / 2.0,
         PLAYER_HEIGHT/2.0,
     );
+    let cat_sprite_flipped = asset_server.load("textures/cat-sprite_flipped.png");
     initialize_player(
         &mut commands,
-        cat_sprite.clone(),
+        cat_sprite_flipped.clone(),
         Side::Right,
         ARENA_HEIGHT - PLAYER_WIDTH / 2.0,
         PLAYER_HEIGHT/2.0,
