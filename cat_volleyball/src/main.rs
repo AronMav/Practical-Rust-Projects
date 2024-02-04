@@ -4,11 +4,76 @@ const ARENA_WIDTH: f32 = 200.0;
 const ARENA_HEIGHT: f32 = 200.0;
 const PLAYER_HEIGHT: f32 = 32.0;
 const PLAYER_WIDTH: f32 = 22.0;
+const PLAYER_SPEED: f32 = 60.0;
 
 #[derive(Copy, Clone)]
 enum Side {
     Left,
     Right,
+}
+
+impl Side {
+    // Get keycode for left
+    fn go_left_key(&self) -> KeyCode {
+        match self {
+            Side::Left => KeyCode::A,
+            Side::Right => KeyCode::Left,
+        }
+    }
+
+    // Get keycode for move right
+    fn go_right_key(&self) -> KeyCode {
+        match self {
+            Side::Left => KeyCode::D,
+            Side::Right => KeyCode::Right,
+        }
+    }
+
+    // Determine the permissible range of the cat
+    fn range(&self) -> (f32, f32) {
+        match self {
+            Side::Left => (
+                PLAYER_WIDTH / 2.0,
+                ARENA_WIDTH / 2.0 - PLAYER_WIDTH / 2.0
+            ),
+            Side::Right => (
+                ARENA_WIDTH / 2.0 + PLAYER_WIDTH / 2.0,
+                ARENA_WIDTH - PLAYER_WIDTH / 2.0,
+            ),
+        }
+    }
+}
+
+fn player(
+    keyboard_input: Res<Input<KeyCode>>,
+    time: Res<Time>,
+    mut query: Query<(&Player, &mut Transform)>,
+) {
+    for (player, mut transform) in query.iter_mut() {
+        let left = if keyboard_input.pressed(
+            player.side.go_left_key())
+        {
+            -1.0f32
+        } else {
+            0.0
+        };
+        let right = if keyboard_input.pressed(
+            player.side.go_right_key())
+        {
+            1.0f32
+        } else {
+            0.0
+        };
+        let direction = left + right;
+        let offset = direction * PLAYER_SPEED
+            * time.raw_delta_seconds();
+
+        // Apply movement deltas
+        transform.translation.x += offset;
+        let (left_limit, ring_limit) = player.side.range();
+        transform.translation.x = transform.translation.x.clamp(
+            left_limit, ring_limit);
+    }
 }
 
 #[derive(Component)]
@@ -102,5 +167,6 @@ fn main() {
         }))
         .insert_resource(ClearColor(Color::rgb (0.0, 0.0, 0.0)))
         .add_startup_system(setup)
+        .add_system(player)
         .run();
 }
