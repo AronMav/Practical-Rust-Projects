@@ -5,6 +5,15 @@ const ARENA_HEIGHT: f32 = 200.0;
 const PLAYER_HEIGHT: f32 = 32.0;
 const PLAYER_WIDTH: f32 = 22.0;
 const PLAYER_SPEED: f32 = 60.0;
+const BALL_VELOCITY_X: f32 = 30.0;
+const BALL_VELOCITY_Y: f32 = 0.0;
+const BALL_RADIUS: f32 = 4.0;
+
+#[derive(Component)]
+pub struct Ball{
+    pub velocity: Vec2,
+    pub radius: f32,
+}
 
 #[derive(Copy, Clone)]
 enum Side {
@@ -100,6 +109,29 @@ fn initialize_player(
     ));
 }
 
+//// Initializes one ball in the middle-ish of the arena.
+fn initialize_ball(
+    commands: &mut Commands,
+    _asset_server: &Res<AssetServer>,
+    atlas: Handle<TextureAtlas>,
+    ball_sprite: usize,
+){
+    commands.spawn((
+        Ball {
+            velocity: Vec2::new(BALL_VELOCITY_X, BALL_VELOCITY_Y),
+            radius: BALL_RADIUS,
+        },
+        SpriteSheetBundle {
+            sprite: TextureAtlasSprite::new(ball_sprite),
+            texture_atlas: atlas,
+            transform: Transform::from_xyz(
+                ARENA_WIDTH / 2.0,
+                ARENA_HEIGHT / 2.0, 0.0),
+            ..default()
+        },
+    ));
+}
+
 fn setup(mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
@@ -113,6 +145,15 @@ fn setup(mut commands: Commands,
     let left_cat_corner = Vec2::new(11.0, 1.0);
     let right_cat_corner = Vec2::new(35.0, 1.0);
     let cat_size = Vec2::new(22.0, 32.0);
+
+    let ball_corner = Vec2::new(1.0, 1.0);
+    let ball_size = Vec2::new(8.0, 8.0);
+
+    let ball_index =
+        sprite_atlas.add_texture(Rect::from_corners(
+            ball_corner,
+            ball_corner + ball_size
+        ));
 
     let left_cat_index = sprite_atlas.add_texture(
         Rect::from_corners(
@@ -135,6 +176,13 @@ fn setup(mut commands: Commands,
             ARENA_HEIGHT/2.0,1.0),
         ..default()
     });
+
+    initialize_ball(
+        &mut  commands,
+        &asset_server,
+        texture_atlas_handle.clone(),
+        ball_index,
+    );
 
     initialize_player(
         &mut commands,
