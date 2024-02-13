@@ -11,6 +11,13 @@ const BALL_VELOCITY_Y: f32 = 0.0;
 const BALL_RADIUS: f32 = 4.0;
 pub const GRAVITY_ACCELERATION: f32 = -40.0;
 
+pub const SCORE_FONT_SIZE: f32 = 20.0;
+
+#[derive(Component)]
+struct ScoreBoard {
+    side: Side
+}
+
 #[derive(Component)]
 pub struct Ball{
     pub velocity: Vec2,
@@ -21,6 +28,17 @@ pub struct Ball{
 enum Side {
     Left,
     Right,
+}
+
+#[derive(Component)]
+struct Player {
+    side: Side,
+}
+
+#[derive(Resource)]
+struct Score {
+    left: usize,
+    right: usize,
 }
 
 impl Side {
@@ -104,11 +122,6 @@ fn move_ball(
     }
 }
 
-#[derive(Component)]
-struct Player {
-    side: Side,
-}
-
 fn initialize_player(
     commands: &mut Commands,
     atlas: Handle<TextureAtlas>,
@@ -148,6 +161,36 @@ fn initialize_ball(
                 ARENA_HEIGHT / 2.0, 0.0),
             ..default()
         },
+    ));
+}
+
+fn initialize_scoreboard(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    side: Side,
+    x: f32,
+) {
+    commands.spawn((
+        ScoreBoard { side },
+        TextBundle::from_sections([
+            TextSection::from_style(TextStyle {
+                font_size: SCORE_FONT_SIZE,
+                color: Color::WHITE,
+                font: asset_server.load("font/square.ttf"),
+        })])
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    top: Val::Px(25.0),
+                    left: Val::Px(x),
+                    ..default()
+                },
+                ..default()
+            })
+            .with_text_alignment(match side {
+                Side::Left => TextAlignment::Left,
+                Side::Right => TextAlignment::Right,
+            }),
     ));
 }
 
@@ -220,6 +263,21 @@ fn setup(mut commands: Commands,
         ARENA_HEIGHT - PLAYER_WIDTH / 2.0,
         PLAYER_HEIGHT/2.0,
     );
+
+    initialize_scoreboard(
+        &mut commands,
+        &asset_server,
+        Side::Left,
+        ARENA_WIDTH / 2.0 - 25.0
+    );
+
+    initialize_scoreboard(
+        &mut commands,
+        &asset_server,
+        Side::Right,
+        ARENA_WIDTH / 2.0 + 25.0
+    )
+
 }
 
 fn point_in_rect(
@@ -287,6 +345,42 @@ fn bounce(
     }
 }
 
+fn scoring(
+    mut query: Query<(&mut Ball, &mut Transform)>,
+    mut score: ResMut<Score>,
+) {
+    for ( mut ball, mut transform) in query.iter_mut() {
+        let ball_x = transform.translation.x;
+        let ball_y = transform.translation.y;
+
+        if ball_y < ball.radius {
+            if ball_x <= ARENA_WIDTH / 2.0 {
+                score.right += 1;
+                ball.velocity.x = ball.velocity.x.abs();
+            } else {
+                score.left += 1;
+                ball.velocity.x = -ball.velocity.x.abs();
+            }
+            transform.translation.x = ARENA_WIDTH / 2.0;
+            transform.translation.y = ARENA_HEIGHT / 2.0;
+
+            ball.velocity.y = 0.0;
+        }
+    }
+}
+
+fn score_display(
+    score: Res<Score>,
+    mut query: Query<(&mut Text, &ScoreBoard)>
+) {
+    for (mut text, scoreboard) in query.iter_mut() {
+        text.sections[0].value = match scoreboard.side {
+            Side::Left => score.left.to_string(),
+            Side::Right => score.right.to_string(),
+        };
+    }
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -298,9 +392,12 @@ fn main() {
             ..default()
         }))
         .insert_resource(ClearColor(Color::rgb (0.0, 0.0, 0.0)))
+        .insert_resource(Score { left: 0, right: 0})
         .add_startup_system(setup)
         .add_system(player)
         .add_system(bounce)
         .add_system(move_ball)
+        .add_system(scoring)
+        .add_system(score_display)
         .run();
 }
